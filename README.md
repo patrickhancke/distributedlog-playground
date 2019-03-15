@@ -4,7 +4,8 @@
 
 Preparation:
 1. check the _org.apache.distributedlog.distributedlog-core_ version in the _pom.xml_ file
-2. make sure you can connect to a Zookeeper / Bookkeeper cluster with an already created namespace
+2. make sure you can connect to a Zookeeper / Bookkeeper cluster with an already created namespace.
+Mine is running with version 4.7.3 on Debian Linux within a VirtualBox on Windows 10.
 3. verify and configure if necessary the connection settings in the _Settings_ class
 
 Configuration:
