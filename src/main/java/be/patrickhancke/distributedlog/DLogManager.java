@@ -93,9 +93,8 @@ public class DLogManager implements Closeable {
         return Try.of(() -> {
             Try<DistributedLogManager> logManagerTry = getLogManagerForLogname(logName);
             if (logManagerTry.isSuccess()) {
-                log.info("getting log reader for log name {}, starting from txid {}", logName, fromTxid);
-                AsyncLogReader asyncLogReader = logManagerTry.get().openAsyncLogReader(fromTxid).get();
-                return asyncLogReader;
+                log.info("opening log reader for log {} starting from txid {}", logName, fromTxid);
+                return logManagerTry.get().openAsyncLogReader(fromTxid).get();
             } else {
                 log.error("error getting DLM for log name {}", logName);
                 throw logManagerTry.getCause();
@@ -109,17 +108,15 @@ public class DLogManager implements Closeable {
             AsyncLogReader logReader = readerTry.get();
             Future<?> pendingCompletion = this.readers.submit(() -> {
                 boolean running = true;
-                log.info("start reading");
+                log.info("start reading log {} from txid {}", logName, fromTxid);
                 while (running) {
                     try {
                         log.debug("trying to read next entry");
                         LogRecordWithDLSN logRecordWithDLSN = logReader.readNext().get();
                         long transactionId = logRecordWithDLSN.getTransactionId();
-                        log.info("read entry with txid {}", transactionId);
-                        log.debug("calling {}", logRecordCallback);
+                        log.debug("read {} with txid {}, calling {}", logRecordWithDLSN, transactionId, logRecordCallback);
                         logRecordCallback.handle(transactionId, logRecordWithDLSN.getPayload());
-                        log.debug("called {}", logRecordCallback);
-                        log.debug("calling {}", transactionIdCallback);
+                        log.debug("called {}, now calling {}", logRecordCallback, transactionIdCallback);
                         transactionIdCallback.markProcessed(transactionId);
                         log.debug("called {}", transactionIdCallback);
                     } catch (InterruptedException | ExecutionException e) {
