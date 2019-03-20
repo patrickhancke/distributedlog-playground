@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Future;
 
 public class TailingReader {
-    private static final int NUMBER_OF_READERS = 5;
+    private static final int NUMBER_OF_READERS_PER_LOG = 3;
     private static final Logger log;
 
     static {
@@ -31,13 +31,14 @@ public class TailingReader {
         Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, 20);
         dLogManagerTry
                 .onSuccess(dLogManager -> {
-                    for (int i = 0; i < NUMBER_OF_READERS; i++) {
-                        Future<?> tailLogCompletion = dLogManager.tailLog(Settings.DLog.logName(), 0L,
-                                (transactionId, payload) -> log.info("handling txid {} with payload {}", transactionId, byteArrayToString(payload)),
-                                transactionId -> log.info("marking log record with txid {} as processed", transactionId));
-                        log.info("created future {}", tailLogCompletion);
+                    for (int j = 0; j < Settings.DLog.NUMBER_OF_LOGS; j++) {
+                        for (int i = 0; i < NUMBER_OF_READERS_PER_LOG; i++) {
+                            Future<?> tailLogCompletion = dLogManager.tailLog(Settings.DLog.logName(j), 0L,
+                                    (transactionId, payload) -> log.info("handling txid {} with payload {}", transactionId, byteArrayToString(payload)),
+                                    transactionId -> log.info("marking log record with txid {} as processed", transactionId));
+                            log.info("created future {}", tailLogCompletion);
+                        }
                     }
-
                     /*try {
                         log.info("blocking until {} is completed", tailLogCompletion);
                         tailLogCompletion.get();
