@@ -35,7 +35,12 @@ public class DLogManager implements Closeable {
         this.namespace = namespace;
         this.logManagersPerLogname = new HashMap<>();
         this.logWritersPerLogname = new HashMap<>();
-        this.readers = Executors.newFixedThreadPool(maxNumberOfReaders, readerThreadFactory());
+        if (maxNumberOfReaders > 0) {
+            this.readers = Executors.newFixedThreadPool(maxNumberOfReaders, readerThreadFactory());
+        } else {
+            log.info("reader thread pool disabled");
+            this.readers = null;
+        }
     }
 
     private static ThreadFactory readerThreadFactory() {
@@ -58,6 +63,10 @@ public class DLogManager implements Closeable {
         });
     }
 
+    public static Try<DLogManager> create(URI uri, DistributedLogConfiguration dlogConfiguration) {
+        return create(uri, dlogConfiguration, -1);
+    }
+
     private static void safeClose(AsyncLogWriter logWriter) {
         try {
             log.info("closing {}", logWriter);
@@ -78,6 +87,7 @@ public class DLogManager implements Closeable {
         }
     }
 
+
     public Try<DLSN> writeRecord(String logName, byte[] payload) {
         log.info("writing record to log {}", logName);
         return Try.of(() -> {
@@ -93,7 +103,7 @@ public class DLogManager implements Closeable {
         });
     }
 
-    Try<AsyncLogReader> openReader(String logName, long fromTxid) {
+    private Try<AsyncLogReader> openReader(String logName, long fromTxid) {
         return Try.of(() -> {
             Try<DistributedLogManager> logManagerTry = getLogManagerForLogname(logName);
             if (logManagerTry.isSuccess()) {
@@ -107,10 +117,11 @@ public class DLogManager implements Closeable {
     }
 
     public Future<?> tailLog(String logName, long fromTxid, LogRecordCallback logRecordCallback, TransactionIdCallback transactionIdCallback) {
+        Preconditions.checkNotNull(this.readers, String.format("%s has not been configured with a reader thread pool", this));
         Try<AsyncLogReader> readerTry = openReader(logName, fromTxid);
         if (readerTry.isSuccess()) {
             AsyncLogReader logReader = readerTry.get();
-            Future<?> pendingCompletion = this.readers.submit(() -> {
+            return this.readers.submit(() -> {
                 boolean running = true;
                 ReaderStatistics readerStatistics = new ReaderStatistics(logName, fromTxid);
                 log.info("start reading log {} from txid {}", logName, fromTxid);
@@ -139,7 +150,6 @@ public class DLogManager implements Closeable {
                 }
                 log.info("closed reader {}", logReader);
             });
-            return pendingCompletion;
         } else {
             throw new RuntimeException(readerTry.getCause());
         }
@@ -209,7 +219,9 @@ public class DLogManager implements Closeable {
             safeClose(logWriter);
         }
         safeClose(namespace);
-        close(readers);
+        if (readers != null) {
+            close(readers);
+        }
     }
 
     private void close(ExecutorService executor) {

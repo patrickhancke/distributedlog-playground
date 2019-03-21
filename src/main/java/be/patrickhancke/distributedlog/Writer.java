@@ -18,10 +18,9 @@ import java.util.concurrent.TimeUnit;
 
 public class Writer {
     private static final Logger log;
-    private static final int MAX_NUMBER_ITERATIONS = 10;
+    private static final int MAX_NUMBER_ITERATIONS = 100;
     private static final int MILLISECONDS_TO_SLEEP_BETWEEN_WRITES = 100;
     private static final int MILLISECONDS_BUFFER = 60 * 1000;
-    private static final int MAX_NUMBER_OF_READERS = 1;
 
     static {
         System.setProperty("logback.configurationFile", "logback-writer.xml");
@@ -43,14 +42,14 @@ public class Writer {
         log.info("created {}", dlogConfiguration);
 
         int numberOfWriters = Settings.App.NUMBER_OF_LOGS;
-        ExecutorService executorService = Executors.newFixedThreadPool(numberOfWriters, threadFactory());
+        ExecutorService writersPool = Executors.newFixedThreadPool(numberOfWriters, threadFactory());
 
-        Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, MAX_NUMBER_OF_READERS);
+        Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration);
         dLogManagerTry
                 .onSuccess(dLogManager -> {
                     for (int i = 0; i < numberOfWriters; i++) {
                         int logSequenceNumber = i;
-                        executorService.submit(() -> {
+                        writersPool.submit(() -> {
                             log.info("writer {} starting", logSequenceNumber);
                             try {
                                 int currentIteration = 0;
@@ -68,9 +67,9 @@ public class Writer {
                     }
                 })
                 .onFailure(throwable -> log.error("error", throwable));
-        executorService.shutdown();
+        writersPool.shutdown();
         log.info("all threads launched, waiting for termination...");
-        boolean terminated = executorService.awaitTermination(millisecondsToWaitForTermination(), TimeUnit.MILLISECONDS);
+        boolean terminated = writersPool.awaitTermination(millisecondsToWaitForTermination(), TimeUnit.MILLISECONDS);
         log.info("termination return state: {}", terminated);
         dLogManagerTry.onSuccess(DLogManager::close);
     }
