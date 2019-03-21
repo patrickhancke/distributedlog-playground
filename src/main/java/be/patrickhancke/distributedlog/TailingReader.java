@@ -1,5 +1,6 @@
 package be.patrickhancke.distributedlog;
 
+import be.patrickhancke.distributedlog.mgr.DLogManager;
 import io.vavr.control.Try;
 import org.apache.distributedlog.DistributedLogConfiguration;
 import org.slf4j.Logger;
@@ -34,6 +35,7 @@ public class TailingReader {
                     for (int j = 0; j < Settings.App.NUMBER_OF_LOGS; j++) {
                         for (int i = 0; i < NUMBER_OF_READERS_PER_LOG; i++) {
                             String logName = Settings.DLog.logName(j);
+                            log.info("start reading from log {}", logName);
                             Future<?> tailLogCompletion = dLogManager.tailLog(logName, 0L,
                                     (transactionId, payload) -> log.info("handling txid {} from log {} with payload {}", transactionId, logName, byteArrayToString(payload)),
                                     transactionId -> log.info("marking log record with txid {} from log {} as processed", transactionId, logName));

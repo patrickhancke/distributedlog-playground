@@ -1,5 +1,6 @@
 package be.patrickhancke.distributedlog;
 
+import be.patrickhancke.distributedlog.mgr.DLogManager;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.vavr.control.Try;
 import org.apache.distributedlog.DLSN;

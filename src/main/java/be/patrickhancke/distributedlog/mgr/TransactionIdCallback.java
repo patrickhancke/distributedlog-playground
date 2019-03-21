@@ -1,4 +1,4 @@
-package be.patrickhancke.distributedlog;
+package be.patrickhancke.distributedlog.mgr;
 
 @FunctionalInterface
 public interface TransactionIdCallback {

@@ -1,4 +1,4 @@
-package be.patrickhancke.distributedlog;
+package be.patrickhancke.distributedlog.mgr;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -42,7 +42,7 @@ public class DLogManager implements Closeable {
         return new ThreadFactoryBuilder().setNameFormat("dlog-reader-%d").setDaemon(true).build();
     }
 
-    static Try<DLogManager> create(URI uri, DistributedLogConfiguration configuration, int maxNumberOfReaders) {
+    public static Try<DLogManager> create(URI uri, DistributedLogConfiguration configuration, int maxNumberOfReaders) {
         return Try.of(() -> {
             log.info("constructing namespace for URI {} with configuration {}", uri, configuration.getPropsAsString());
             return new DLogManager(NamespaceBuilder.newBuilder()
@@ -74,7 +74,7 @@ public class DLogManager implements Closeable {
         }
     }
 
-    Try<DLSN> writeRecord(String logName, byte[] payload) {
+    public Try<DLSN> writeRecord(String logName, byte[] payload) {
         log.info("writing record to log {}", logName);
         return Try.of(() -> {
             Try<WriterWithTxid> writerTry = getWriterForLogname(logName);
@@ -102,7 +102,7 @@ public class DLogManager implements Closeable {
         });
     }
 
-    Future<?> tailLog(String logName, long fromTxid, LogRecordCallback logRecordCallback, TransactionIdCallback transactionIdCallback) {
+    public Future<?> tailLog(String logName, long fromTxid, LogRecordCallback logRecordCallback, TransactionIdCallback transactionIdCallback) {
         Try<AsyncLogReader> readerTry = openReader(logName, fromTxid);
         if (readerTry.isSuccess()) {
             AsyncLogReader logReader = readerTry.get();
