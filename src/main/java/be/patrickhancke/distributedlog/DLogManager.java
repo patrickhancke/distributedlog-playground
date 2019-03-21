@@ -80,7 +80,7 @@ public class DLogManager implements Closeable {
             Try<WriterWithTxid> writerTry = getWriterForLogname(logName);
             if (writerTry.isSuccess()) {
                 DLSN dlsn = writerTry.get().write(payload).get();
-                log.info("written record, DLSN={}", dlsn);
+                log.info("written record to log {}, DLSN={}", logName, dlsn);
                 return dlsn;
             } else {
                 log.error("failed to get a writer for log name {}", logName, writerTry.getCause());

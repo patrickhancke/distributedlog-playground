@@ -3,11 +3,13 @@ package be.patrickhancke.distributedlog;
 import java.time.ZonedDateTime;
 
 class Settings {
+    interface App {
+        int NUMBER_OF_LOGS = 300;
+    }
 
     static class DLog {
         final static String NAMESPACE = "testcase";
         final static String URI = "distributedlog://localhost:2181/" + NAMESPACE;
-        final static int NUMBER_OF_LOGS = 5;
 
         static String logName(int sequenceNumber) {
             ZonedDateTime now = ZonedDateTime.now();

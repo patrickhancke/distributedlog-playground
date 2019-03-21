@@ -15,15 +15,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-public class SingleWriter {
+public class Writer {
     private static final Logger log;
-    private static final int MAX_NUMBER_ITERATIONS = 200;
-    private static final int SECONDS_TO_SLEEP_BETWEEN_WRITES = 5;
-    private static final int BUFFER = 60;
+    private static final int MAX_NUMBER_ITERATIONS = 10;
+    private static final int MILLISECONDS_TO_SLEEP_BETWEEN_WRITES = 100;
+    private static final int MILLISECONDS_BUFFER = 60 * 1000;
 
     static {
         System.setProperty("logback.configurationFile", "logback-writer.xml");
-        log = LoggerFactory.getLogger(SingleWriter.class);
+        log = LoggerFactory.getLogger(Writer.class);
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -40,7 +40,7 @@ public class SingleWriter {
         dlogConfiguration.setThrowExceptionOnMissing(true);
         log.info("created {}", dlogConfiguration);
 
-        int numberOfWriters = Settings.DLog.NUMBER_OF_LOGS;
+        int numberOfWriters = Settings.App.NUMBER_OF_LOGS;
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfWriters, threadFactory());
 
         Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, 20);
@@ -49,18 +49,18 @@ public class SingleWriter {
                     for (int i = 0; i < numberOfWriters; i++) {
                         int logSequenceNumber = i;
                         executorService.submit(() -> {
+                            log.info("writer {} starting", logSequenceNumber);
                             try {
                                 int currentIteration = 0;
                                 while (currentIteration <= MAX_NUMBER_ITERATIONS) {
                                     Try<DLSN> dlsnTry = dLogManager.writeRecord(Settings.DLog.logName(logSequenceNumber), payload(currentIteration + " : patrick-test-" + ZonedDateTime.now()));
                                     dlsnTry.getOrElseThrow(throwable -> throwable);
-                                    TimeUnit.SECONDS.sleep(SECONDS_TO_SLEEP_BETWEEN_WRITES);
+                                    TimeUnit.MILLISECONDS.sleep(MILLISECONDS_TO_SLEEP_BETWEEN_WRITES);
                                     currentIteration++;
                                 }
+                                log.info("writer {} finished, written {} records", logSequenceNumber, currentIteration);
                             } catch (Throwable t) {
                                 log.error("error", t);
-                            } finally {
-                                dLogManager.close();
                             }
                         });
                     }
@@ -68,12 +68,13 @@ public class SingleWriter {
                 .onFailure(throwable -> log.error("error", throwable));
         executorService.shutdown();
         log.info("all threads launched, waiting for termination...");
-        boolean terminated = executorService.awaitTermination(secondsToWaitForTermination(), TimeUnit.SECONDS);
+        boolean terminated = executorService.awaitTermination(millisecondsToWaitForTermination(), TimeUnit.MILLISECONDS);
         log.info("termination return state: {}", terminated);
+        dLogManagerTry.onSuccess(DLogManager::close);
     }
 
-    private static int secondsToWaitForTermination() {
-        return BUFFER + MAX_NUMBER_ITERATIONS * SECONDS_TO_SLEEP_BETWEEN_WRITES;
+    private static int millisecondsToWaitForTermination() {
+        return MILLISECONDS_BUFFER + MAX_NUMBER_ITERATIONS * MILLISECONDS_TO_SLEEP_BETWEEN_WRITES;
     }
 
     private static ThreadFactory threadFactory() {

@@ -31,21 +31,15 @@ public class TailingReader {
         Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, 20);
         dLogManagerTry
                 .onSuccess(dLogManager -> {
-                    for (int j = 0; j < Settings.DLog.NUMBER_OF_LOGS; j++) {
+                    for (int j = 0; j < Settings.App.NUMBER_OF_LOGS; j++) {
                         for (int i = 0; i < NUMBER_OF_READERS_PER_LOG; i++) {
-                            Future<?> tailLogCompletion = dLogManager.tailLog(Settings.DLog.logName(j), 0L,
-                                    (transactionId, payload) -> log.info("handling txid {} with payload {}", transactionId, byteArrayToString(payload)),
-                                    transactionId -> log.info("marking log record with txid {} as processed", transactionId));
+                            String logName = Settings.DLog.logName(j);
+                            Future<?> tailLogCompletion = dLogManager.tailLog(logName, 0L,
+                                    (transactionId, payload) -> log.info("handling txid {} from log {} with payload {}", transactionId, logName, byteArrayToString(payload)),
+                                    transactionId -> log.info("marking log record with txid {} from log {} as processed", transactionId, logName));
                             log.info("created future {}", tailLogCompletion);
                         }
                     }
-                    /*try {
-                        log.info("blocking until {} is completed", tailLogCompletion);
-                        tailLogCompletion.get();
-                        log.info("{} has completed", tailLogCompletion);
-                    } catch (InterruptedException | ExecutionException e) {
-                        log.error("error completing {}", tailLogCompletion);
-                    }*/
                 });
     }
 
