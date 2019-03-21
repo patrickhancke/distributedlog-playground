@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Future;
 
 public class TailingReader {
-    private static final int NUMBER_OF_READERS_PER_LOG = 1;
+    private static final int NUMBER_OF_READERS_PER_LOG = 3;
     private static final Logger log;
 
     static {
