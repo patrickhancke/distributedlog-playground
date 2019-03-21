@@ -35,11 +35,15 @@ public class DLogManager implements Closeable {
         this.namespace = namespace;
         this.logManagersPerLogname = new HashMap<>();
         this.logWritersPerLogname = new HashMap<>();
-        this.readers = Executors.newFixedThreadPool(maxNumberOfReaders, threadFactory());
+        this.readers = Executors.newFixedThreadPool(maxNumberOfReaders, readerThreadFactory());
     }
 
-    private static ThreadFactory threadFactory() {
-        return new ThreadFactoryBuilder().setNameFormat("dlog-reader-%d").setDaemon(true).build();
+    private static ThreadFactory readerThreadFactory() {
+        return new ThreadFactoryBuilder()
+                .setNameFormat("dlog-reader-%d")
+                .setDaemon(true)
+                .setUncaughtExceptionHandler((thread, throwable) -> log.error("error while running thread {}", thread, throwable))
+                .build();
     }
 
     public static Try<DLogManager> create(URI uri, DistributedLogConfiguration configuration, int maxNumberOfReaders) {
@@ -108,6 +112,7 @@ public class DLogManager implements Closeable {
             AsyncLogReader logReader = readerTry.get();
             Future<?> pendingCompletion = this.readers.submit(() -> {
                 boolean running = true;
+                ReaderStatistics readerStatistics = new ReaderStatistics(logName, fromTxid);
                 log.info("start reading log {} from txid {}", logName, fromTxid);
                 while (running) {
                     try {
@@ -117,7 +122,8 @@ public class DLogManager implements Closeable {
                         log.debug("read {} with txid {}, calling {}", logRecordWithDLSN, transactionId, logRecordCallback);
                         logRecordCallback.handle(transactionId, logRecordWithDLSN.getPayload());
                         log.debug("called {}, now calling {}", logRecordCallback, transactionIdCallback);
-                        transactionIdCallback.markProcessed(transactionId);
+                        readerStatistics.markRead(transactionId);
+                        transactionIdCallback.markProcessed(transactionId, readerStatistics);
                         log.debug("called {}", transactionIdCallback);
                     } catch (InterruptedException | ExecutionException e) {
                         log.error("error reading next entry", e);

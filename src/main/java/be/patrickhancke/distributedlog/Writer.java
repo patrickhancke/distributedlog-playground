@@ -21,6 +21,7 @@ public class Writer {
     private static final int MAX_NUMBER_ITERATIONS = 10;
     private static final int MILLISECONDS_TO_SLEEP_BETWEEN_WRITES = 100;
     private static final int MILLISECONDS_BUFFER = 60 * 1000;
+    private static final int MAX_NUMBER_OF_READERS = 1;
 
     static {
         System.setProperty("logback.configurationFile", "logback-writer.xml");
@@ -37,14 +38,14 @@ public class Writer {
                 .setReadAheadBatchSize(10)
                 .setAlertWhenPositioningOnTruncated(true)
                 .setCreateStreamIfNotExists(true)
-                .setLogSegmentRollingIntervalMinutes(1);
+                .setLogSegmentRollingIntervalMinutes(15);
         dlogConfiguration.setThrowExceptionOnMissing(true);
         log.info("created {}", dlogConfiguration);
 
         int numberOfWriters = Settings.App.NUMBER_OF_LOGS;
         ExecutorService executorService = Executors.newFixedThreadPool(numberOfWriters, threadFactory());
 
-        Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, 20);
+        Try<DLogManager> dLogManagerTry = DLogManager.create(URI.create(Settings.DLog.URI), dlogConfiguration, MAX_NUMBER_OF_READERS);
         dLogManagerTry
                 .onSuccess(dLogManager -> {
                     for (int i = 0; i < numberOfWriters; i++) {
