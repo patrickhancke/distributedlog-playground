@@ -28,7 +28,7 @@ public class DLogManager implements Closeable {
     private static final long INITIAL_TXID = 0L;
     private final Namespace namespace;
     private final Map<String, DistributedLogManager> logManagersPerLogname;
-    private final Map<String, WriterWithTxid> logWritersPerLogname;
+    private final Map<String, AsyncLogWriterWithTxid> logWritersPerLogname;
     private final ExecutorService readers;
 
     private DLogManager(Namespace namespace, int maxNumberOfReaders) {
@@ -91,7 +91,7 @@ public class DLogManager implements Closeable {
     public Try<DLSN> writeRecord(String logName, byte[] payload) {
         log.info("writing record to log {}", logName);
         return Try.of(() -> {
-            Try<WriterWithTxid> writerTry = getWriterForLogname(logName);
+            Try<AsyncLogWriterWithTxid> writerTry = getWriterForLogname(logName);
             if (writerTry.isSuccess()) {
                 DLSN dlsn = writerTry.get().write(payload).get();
                 log.info("written record to log {}, DLSN={}", logName, dlsn);
@@ -155,11 +155,11 @@ public class DLogManager implements Closeable {
         }
     }
 
-    private Try<WriterWithTxid> getWriterForLogname(String logName) {
+    private Try<AsyncLogWriterWithTxid> getWriterForLogname(String logName) {
         log.debug("getting writer for log name {}", logName);
         if (this.logWritersPerLogname.containsKey(logName)) {
             return Try.of(() -> {
-                WriterWithTxid logWriter = logWritersPerLogname.get(logName);
+                AsyncLogWriterWithTxid logWriter = logWritersPerLogname.get(logName);
                 log.debug("returning cached log writer {} for log name {}", logWriter, logName);
                 return logWriter;
             });
@@ -177,7 +177,7 @@ public class DLogManager implements Closeable {
                             }));
                     if (logWriterTry.isSuccess()) {
                         long lastTxId = Try.of(logManager::getLastTxId).getOrElse(INITIAL_TXID);
-                        WriterWithTxid writerWithTxid = new WriterWithTxid(logWriterTry.get(), lastTxId);
+                        AsyncLogWriterWithTxid writerWithTxid = new AsyncLogWriterWithTxid(logWriterTry.get(), lastTxId);
                         log.info("returning {} for log name {}", writerWithTxid, logName);
                         logWritersPerLogname.put(logName, writerWithTxid);
                         return writerWithTxid;
@@ -215,7 +215,7 @@ public class DLogManager implements Closeable {
         for (DistributedLogManager logManager : logManagersPerLogname.values()) {
             safeClose(logManager);
         }
-        for (WriterWithTxid logWriter : logWritersPerLogname.values()) {
+        for (AsyncLogWriterWithTxid logWriter : logWritersPerLogname.values()) {
             safeClose(logWriter);
         }
         safeClose(namespace);
@@ -248,13 +248,12 @@ public class DLogManager implements Closeable {
     }
 
     @ToString
-    private class WriterWithTxid implements Closeable {
+    private class AsyncLogWriterWithTxid extends AbstractLogWriterWithTxid {
         private final AsyncLogWriter logWriter;
-        private long txid;
 
-        private WriterWithTxid(AsyncLogWriter logWriter, long lastTxid) {
+        private AsyncLogWriterWithTxid(AsyncLogWriter logWriter, long lastTxid) {
+            super(lastTxid);
             this.logWriter = logWriter;
-            this.txid = lastTxid;
         }
 
         @Override
@@ -262,9 +261,9 @@ public class DLogManager implements Closeable {
             safeClose(this.logWriter);
         }
 
-        CompletableFuture<DLSN> write(byte[] payload) {
-            log.debug("writing payload with txid {}", txid);
-            return logWriter.write(new LogRecord(txid++, payload));
+        @Override
+        CompletableFuture<DLSN> write(long txid, byte[] payload) {
+            return logWriter.write(new LogRecord(txid, payload));
         }
     }
 }
