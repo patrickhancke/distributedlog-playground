@@ -18,6 +18,7 @@ import org.apache.distributedlog.api.namespace.NamespaceBuilder;
 import org.apache.distributedlog.exceptions.LogNotFoundException;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -136,7 +137,7 @@ public class DLogManager implements Closeable {
                         readerStatistics.markRead(transactionId);
                         transactionIdCallback.markProcessed(transactionId, readerStatistics);
                         log.debug("called {}", transactionIdCallback);
-                    } catch (InterruptedException | ExecutionException e) {
+                    } catch (InterruptedException | ExecutionException | IOException e) {
                         log.error("error reading next entry", e);
                         running = false;
                     }
